@@ -10,7 +10,8 @@
    - responsive
    - data normalization
    - signature resizing
-   - signature loading by synchronized field */
+   - signature loading by synchronized field
+   - max dimension restriction by specified component dimension that serves as a bounding box */
 
 (function($) { // Hide scope, no $ conflict
 
@@ -36,6 +37,7 @@ var signatureOverrides = {
 		aspectRatio : null, // Aspect ratio on responsive resizing
 		keepSignature : false, // if true the signature is kept on resolution change
 		dataDim : null, // Optional json dimension data is normalized to
+		maxDimCompId : null // component to retrieve maximum dimension (inner width and height) from.
 	},
 
 	/* Initialise a new signature area. */
@@ -112,8 +114,8 @@ var signatureOverrides = {
 	   @param  init  (boolean, internal) true if initialising */
 	_refresh: function(init) {
 		if (this.resize) {
-			var parent = $(this.canvas);
-			var parentHeight = parent.height();
+			var canvas = $(this.canvas);
+			var canvasHeight = canvas.height();
 			
 			var width = this.element.width();
 			var height = this.element.height();
@@ -125,11 +127,50 @@ var signatureOverrides = {
 			
 			// responsive resizing
 			height = Math.round(width / aspectRatio);
-			parentHeight = Math.round(width / aspectRatio);
 			
-			parent.attr('width', width);
-			parent.attr('height', height);
-			$('div', this.canvas).css({width: parent.width(), height: parentHeight});
+
+			// restrict by max dimension optional
+			if (this.options.maxDimCompId) 
+			{
+				var parent = canvas.parent();
+
+				// get parent margin, padding and border size
+				var parentWidthOffset = parent.outerWidth(true) - parent.width();
+				var parentHeightOffset = parent.outerHeight(true) - parent.height();
+				
+				// hide parent to get the inner width before initializing canvas width
+				parent.hide();
+				
+				var maxDimComp = $(this.options.maxDimCompId);
+				// remove canvas margin, padding, border(1px) -> how to detect it!?
+				var maxWidth = maxDimComp.width() - parentWidthOffset;
+				var maxHeight = maxDimComp.height() - parentHeightOffset;
+
+				// default to maximum
+				var width = maxWidth;
+				var height = maxHeight;
+				
+				// aspect ratio boundary - adjust width, or height
+				var aspectRatio = this.options.aspectRatio;
+				if (aspectRatio)
+				{
+					var heightCheck = maxWidth / aspectRatio;
+					// check if height still in bounding box
+					if (heightCheck <= maxHeight)
+						height = heightCheck;
+					// else change width instead
+					else
+						width = maxHeight * aspectRatio;
+				}
+
+				// show again
+				parent.show();
+			}
+			
+			canvas.attr('width', width);
+			canvas.attr('height', height);
+			
+			$('div', this.canvas).css({width: width, height: height});
 		}
 		this._initMainCtx();
 
